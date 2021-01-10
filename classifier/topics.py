@@ -1,3 +1,5 @@
+import pandas as pd
+import nltk
 from itertools import chain
 from collections import defaultdict, Counter
 from sklearn.tree import DecisionTreeClassifier as dct
@@ -32,8 +34,7 @@ class TopicComparator:
         self.freq = freq
         return self
 
-    @staticmethod
-    def get_freq(x: pd.Series):
+    def get_freq(self, x: pd.Series):
         try:
             x_counts = x.apply(nltk.word_tokenize).apply(Counter)
         except:
@@ -43,7 +44,7 @@ class TopicComparator:
                   .DataFrame
                   .from_records(x_counts)
                   .fillna(0)
-                  .reindex(tc.freq.keys(), axis=1)
+                  .reindex(self.freq.keys(), axis=1)
                   .apply(lambda x: x / len(x))
                   )
 

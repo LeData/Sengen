@@ -1,8 +1,12 @@
+import random
+import logging
+import pandas as pd
 from classifier.topics import TopicComparator, Topic
 from generator.gen_CFG import SimpleGenerator
 from nltk.grammar import CFG
 
-topics = {t:Topic(t) for t in ["food", "IT"]}
+
+topics = [Topic(t, None) for t in ["food", "IT"]]
 
 if __name__ == "__main__":
     gr1 = CFG.fromstring(
@@ -34,4 +38,4 @@ if __name__ == "__main__":
 
     a, b = tc.train(dataset, dataset["target"])
 
-    tc.reports['validation']
+    logging.info("Validation report :", tc.reports['validation'])
