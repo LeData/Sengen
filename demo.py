@@ -1,41 +1,44 @@
 import random
 import logging
 import pandas as pd
-from classifier.topics import TopicComparator, Topic
-from generator.gen_CFG import SimpleGenerator
-from nltk.grammar import CFG
-
-
-topics = [Topic(t, None) for t in ["food", "IT"]]
+from classifier.topics import TopicComparator
+from generator.gen_CFG import Topic
 
 if __name__ == "__main__":
-    gr1 = CFG.fromstring(
-        """
+    gr_s = """
         S -> NP VP
         NP -> Adj N | N
         VP -> VB NP | Adv VB NP
-        """)
-    Part1 = {t.name: SimpleGenerator(gr1, t.name[::-1]).add_vocabulary(t.vocabulary) for t in topics}
+        """
+    vocab_IT = {
+        "Adj": ["gigantic", "scalable"],
+        "N": ["Jobs", "line", "device", "leak"],
+        "VB": ["resets", "develops", "commits"],
+        "Adv": ["skillfully", "laborously", "quickly"]}
 
-    n = 300
+    vocab_food = {
+        "Adj": ["aromatic", "delicious", "rotten"],
+        "N": ["Jamie", "knife", "recipe", "leak"],
+        "VB": ["cooks", "develops", "commits"],
+        "Adv": ["skillfully", "enough", "later", "quickly"]}
 
+    topics = [Topic("IT", vocab_IT, gr_s),
+              Topic("food", vocab_food, gr_s)
+              ]
+    n_sentences = 300
 
-    def get_n_topics(n, topics):
-        return [random.choice(topics) for n in range(n)]
-
-
-    dataset = (
+    df = (
         pd
-            .DataFrame(data={
-            'topic_1': get_n_topics(300, [t.name for t in topics]),
-            "topic_2": get_n_topics(300, [t.name for t in topics])})
-            .assign(target=lambda x: x.topic_1 == x.topic_2)
-    )
-    dataset["sentence_1"] = dataset.apply(lambda x: Part1.get(x["topic_1"]).generate_sentence(), axis=1)
-    dataset["sentence_2"] = dataset.apply(lambda x: Part1.get(x["topic_2"]).generate_sentence(), axis=1)
+        .DataFrame(data={
+            'topic_1': random.choices(topics, n_sentences),
+            "topic_2": random.choices(topics, n_sentences)})
+        .assign(target=lambda x: x.topic_1 == x.topic_2,
+                sentence_1=lambda x: x.apply(lambda y: y["topic_1"].get_sentence(), axis=1),
+                sentence_2=lambda x: x.apply(lambda y: y["topic_2"].get_sentence(), axis=1))
+        .drop(["topic_1", "topic_2"], axis=1))
 
     tc = TopicComparator()
 
-    a, b = tc.train(dataset, dataset["target"])
+    a, b = tc.train(df, df["target"])
 
     logging.info("Validation report :", tc.reports['validation'])

@@ -6,12 +6,6 @@ from sklearn.tree import DecisionTreeClassifier as dct
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
 
-class Topic:
-
-    def __init__(self, name, vocabulary):
-        self.name = name
-        self.vocabulary = vocabulary
-
 
 class TopicComparator:
 
@@ -34,11 +28,8 @@ class TopicComparator:
         self.freq = freq
         return self
 
-    def get_freq(self, x: pd.Series):
-        try:
-            x_counts = x.apply(nltk.word_tokenize).apply(Counter)
-        except:
-            raise
+    def get_freq(self, X: pd.Series):
+        x_counts = X.apply(nltk.word_tokenize).apply(Counter)
 
         output = (pd
                   .DataFrame
