@@ -14,7 +14,7 @@ from classifier.tensor_utils import optimize, chain_compose, get_slicer
 
 class TopicComparator(ABC):
 
-    def __init__(self, words):
+    def __init__(self, words: list):
 
         words = list(set(words))
         try:
@@ -25,18 +25,17 @@ class TopicComparator(ABC):
             words.pop(empty_index)
         finally:
             words = ["", *words]
-            # TODO: add test for missing and out of order empty string
 
         self.n_words = len(words)
         self.le = LabelEncoder()
         self.le.fit(words)
 
     @abstractmethod
-    def train(self, X, y, **kwargs):
+    def train(self, X: pd.DataFrame, y: pd.Series, **kwargs):
         pass
 
     @staticmethod
-    def report(y_true, y_pred, threshold:float = 0.5, verbose:bool = True):
+    def report(y_true: np.array, y_pred: np.array, threshold:float = 0.5, verbose:bool = True):
         cm = confusion_matrix(y_true, y_pred > threshold, labels=[0, 1])
         cr = classification_report(y_true, y_pred, output_dict=True)
         if verbose:
@@ -112,7 +111,15 @@ class MPSComparator(TopicComparator):
         self.D[:, 0, :] = torch.eye(self.n_bond)
         self.D.requires_grad = True
 
-    def train(self, X, y, test_size:float = 0.2, print_freq: int = 100):
+    def train(self, X: pd.DataFrame, y:pd.DataFrame, test_size:float = 0.2, print_freq: int = 100) -> tuple:
+        """
+        Trains the model.
+        :param X: Dataframe containing the sentences to compare
+        :param y: target variable
+        :param test_size: size of the validation set
+        :param print_freq: frequency used for logging of the training steps
+        :return: reports on validation
+        """
         max_sentence = (
             X
                 .loc[:, ["sentence_1", "sentence_2"]]
@@ -126,7 +133,7 @@ class MPSComparator(TopicComparator):
         loss_fct = self.define_loss_fct(x_1=X_train_1, x_2=X_train_2, y=y_train)
         optimize(self.D, loss_fct, print_freq=print_freq)
         y_pred_val = self.compare_sentences(X_val_1, X_val_2)
-        self.report(y_val, y_pred_val)
+        return self.report(y_val, y_pred_val)
 
     def prepare_data(self, X: pd.DataFrame, y: pd.Series = None, n_max: int = 30):
         """
