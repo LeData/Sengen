@@ -1,5 +1,40 @@
 import time
 import torch
+from functools import reduce
+import logging
+
+
+def get_slicer(slice_tensor: torch.Tensor, index_dim:int = 1) -> tuple:
+    """
+    Helper slice a tensor by the entries of another tensor.
+
+    :param slice_tensor:
+    :param: dimension to use for indexing
+    :return: tuple for indexing.
+    """
+    try:
+        indexes = range(slice_tensor.shape[index_dim])
+    except (AttributeError, SyntaxError) as e:
+        logging.error("")
+        raise e
+
+    return tuple(slice_tensor.T[i] for i in indexes)
+
+
+def chain_compose(*tensors: torch.Tensor) -> torch.Tensor:
+    """
+    Composes tensors by their first and last dimensions.
+
+    e.g., if nxn tensors are given, you get the matrix multiplication.
+    :param *tensors: tensors to compose
+    :return: result of composition
+    """
+    for tensor in tensors:
+        assert isinstance(tensor, torch.Tensor), "All arguments must be pytorch tensors"
+    def compose(x,y):
+        return torch.tensordot(x,y,dims=1)
+
+    return reduce(compose, tensors)
 
 
 # inspired by the tntensors library
@@ -18,8 +53,8 @@ def optimize(tensors, loss_function, optimizer=torch.optim.Adam, tol=1e-4, max_i
     :param print_freq: progress will be printed every this many iterations
     :param verbose:
     """
-    def log_iter(terminal:bool):
-        if iteration % print_freq != 0 or not terminal:
+    def log_iter(terminal: bool):
+        if iteration % print_freq != 0 and not terminal:
             return None
         iter_spacing = len(str(max_iter))
         losses_str = ' + '.join([f"{l_i.item():10.6f}" for l_i in loss])
