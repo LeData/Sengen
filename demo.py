@@ -1,5 +1,6 @@
 import random
 import logging
+from itertools import chain
 import pandas as pd
 from classifier.topic_comparators import MPSComparator
 from generator.gen_CFG import Topic
@@ -12,15 +13,15 @@ if __name__ == "__main__":
         """
     vocab_IT = {
         "Adj": ["gigantic", "scalable"],
-        "N": ["Jobs", "line", "device", "leak"],
+        "N": ["Jobs", "line", "device", "leak", "network", "computer"],
         "VB": ["resets", "develops", "commits"],
-        "Adv": ["skillfully", "laborously", "quickly"]}
+        "Adv": ["skillfully", "laboriously", "quickly"]}
 
     vocab_food = {
-        "Adj": ["aromatic", "delicious", "rotten"],
-        "N": ["Jamie", "knife", "recipe", "leak"],
-        "VB": ["cooks", "develops", "commits"],
-        "Adv": ["skillfully", "enough", "later", "quickly"]}
+        "Adj": ["aromatic", "delicious", "rotten", "hot", "spicy"],
+        "N": ["Jamie", "knife", "recipe", "Apricot"],
+        "VB": ["cooks", "develops", "commits", "stirs", "fries"],
+        "Adv": ["skillfully", "enough", "later", "quickly", "slowly", "immediately", "carefully"]}
 
     words = [""] + list(set(chain(*vocab_IT.values(), *vocab_food.values())))
 
@@ -38,10 +39,7 @@ if __name__ == "__main__":
                 sentence_2=lambda x: x.apply(lambda y: y["topic_2"].get_sentence(), axis=1))
         .drop(["topic_1", "topic_2"], axis=1))
 
+    tc = MPSComparator(words=words, bond_dimension=5)
+    val_cm, val_cr = tc.train(X=df.drop("target", axis=1), y=df["target"], print_freq=5)
 
-
-
-    tc = MPSComparator(words = words, bond_dimension = 5)
-    tc.train(dataset = dataset, print_freq=5)
-
-    logging.info("Validation report :", tc.reports['validation'])
+    logging.info("Validation report :", val_cr)

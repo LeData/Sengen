@@ -26,6 +26,7 @@ class TestTopicComparator(TestCase):
 
 class TestMPSComparator(TestCase):
     words = ["you", "are", "being", "tested"]
+
     def test_init(self):
         from classifier.topic_comparators import MPSComparator
         comp = MPSComparator(self.words)
