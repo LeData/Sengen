@@ -2,6 +2,7 @@ from itertools import chain
 from abc import ABC, abstractmethod
 from collections import defaultdict, Counter
 from typing import Callable, Any
+import logging
 
 import torch
 import numpy as np
@@ -41,6 +42,10 @@ class TopicComparator(ABC):
     def train(self, X: pd.DataFrame, y: pd.Series, **kwargs):
         pass
 
+    @abstractmethod
+    def predict(self, X: pd.DataFrame):
+        pass
+
     @staticmethod
     def report(y_true: np.array, y_pred: np.array, threshold: float = 0.5, verbose: bool = True):
         cm = confusion_matrix(y_true, y_pred > threshold, labels=[0, 1])
@@ -48,6 +53,7 @@ class TopicComparator(ABC):
         if verbose:
             print(classification_report(y_true, y_pred, output_dict=False))
         return cm, cr
+
 
 class MPSComparator(TopicComparator):
     """
@@ -63,20 +69,48 @@ class MPSComparator(TopicComparator):
         """
         super().__init__(words)
         self.n_bond = bond_dimension
+        self.n_max = None
         # Setting up the tensors representing language (dictionary and sentence start)
         self.S_tensor = torch.ones(self.n_bond) / np.sqrt(self.n_bond)
         self.D = torch.rand([self.n_bond, self.n_words, self.n_bond])
         self.D[:, 0, :] = torch.eye(self.n_bond)
         self.D.requires_grad = True
 
-    def train(self, X: pd.DataFrame, y: pd.DataFrame, test_size: float = 0.2, print_freq: int = 100) -> tuple:
+    def train(self, X: pd.DataFrame, y: pd.Series, test_size: float = 0.2, **kwargs) -> tuple:
         """
         Trains the model.
-        :param X: Dataframe containing the sentences to compare
-        :param y: target variable
+        :param X: pd.DataFrame containing the sentences to compare
+        :param y: pd.Series containing the target variable
         :param test_size: size of the validation set
-        :param print_freq: frequency used for logging of the training steps
+        :param kwargs: kwargs for the optimize funtion
         :return: losses history and reports on validation
+        """
+        X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=test_size)
+
+        X_train, y_train = self.prepare_data(X_train, y_train)
+        loss_fct = self.define_loss_fct(*X_train, y=y_train)
+        losses = optimize(self.D, loss_fct, **kwargs)
+
+        y_pred_val = self.predict(X_val)
+        cm, cr = self.report(y_val.to_numpy(), y_pred_val.detach().numpy() > 0.5)
+        return losses, cm, cr
+
+    def predict(self, X: pd.DataFrame):
+        """
+        Gives the similarity in the sentences topics.
+        :param X: pd.DataFrame of sentences
+        :return:
+        """
+        X = self.prepare_data(X)
+        y_pred = self.compare_sentences(*X)
+        return y_pred
+
+    def prepare_data(self, X: pd.DataFrame, y: pd.Series = None):
+        """
+        Prepares the data for training or scoring
+        :param X: input sentences
+        :param y: target variable
+        :return:
         """
         max_sentence = (
             X
@@ -85,34 +119,25 @@ class MPSComparator(TopicComparator):
             .max()
             .max()
         )
-        X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=test_size)
-        (X_train_1, X_train_2), y_train = self.prepare_data(X_train, y_train, n_max=max_sentence)
-        (X_val_1, X_val_2), y_val = self.prepare_data(X_val, y_val, n_max=max_sentence)
-        loss_fct = self.define_loss_fct(x_1=X_train_1, x_2=X_train_2, y=y_train)
-        losses = optimize(self.D, loss_fct, print_freq=print_freq)
-        y_pred_val = self.compare_sentences(X_val_1, X_val_2)
-        return losses, self.report(y_val.detach().numpy(), y_pred_val.detach().numpy())
+        if self.n_max is None:
+            self.n_max = max_sentence
+        elif self.n_max < max_sentence:
+            logging.warning(msg="The data has sentences longer than the limit of {self.n_max}. Will be truncated.")
 
-    def prepare_data(self, X: pd.DataFrame, y: pd.Series = None, n_max: int = 30):
-        """
-        Prepares the data for training or scoring
-        :param X: input sentences
-        :param y: target variable
-        :param n_max: maximum number of words to be considered per sentence
-        :return:
-        """
         inputs = [
             torch.from_numpy(
                 X[col]
                 .str.split(" ", expand=True)
-                .reindex(range(n_max), axis=1)
+                .reindex(range(self.n_max), axis=1)
                 .fillna("")
                 .apply(self.le.transform)
                 .to_numpy()
             ).long() for col in ["sentence_1", "sentence_2"]]
         if y is not None:
             y = torch.from_numpy(y.to_numpy()).long()
-        return inputs, y
+            return inputs, y
+        else:
+            return inputs
 
     def build_mps(self, length: int) -> torch.Tensor:
         """
@@ -144,7 +169,7 @@ class MPSComparator(TopicComparator):
         :param y_true:
         :return:
         """
-        return -torch.log(y_pred.where(y_true.bool(), 1 - y_pred))
+        return -torch.log(y_pred.where(y_true.bool(), -torch.add(y_pred, -1)))
 
     def compare_sentences(self, s_1: torch.Tensor, s_2: torch.Tensor) -> torch.Tensor:
         """
@@ -173,6 +198,7 @@ class MPSComparator(TopicComparator):
             return torch.sum(self.cross_entropy_loss(y_pred, y))
 
         return loss_fct
+
 
 class TreeComparator(TopicComparator):
     """Class using a simple decision tree classifier to determine similar topics.
@@ -228,3 +254,8 @@ class TreeComparator(TopicComparator):
         y_pred = self.model.predict(X_val.values)
         self.reports["validation"] = self.report(y_true=y_val.values, y_pred=y_pred)[1]
         return X_val, y_val
+
+    def predict(self, df: pd.DataFrame):
+        X = self.prepare_data(df.sentence_1, df.sentence_2, training=False)
+        y_pred = self.model.predict(X)
+        return y_pred

@@ -39,7 +39,7 @@ if __name__ == "__main__":
                 sentence_2=lambda x: x.apply(lambda y: y["topic_2"].get_sentence(), axis=1))
         .drop(["topic_1", "topic_2"], axis=1))
 
-    tc = MPSComparator(words=words, bond_dimension=5)
-    val_cm, val_cr = tc.train(X=df.drop("target", axis=1), y=df["target"], print_freq=5)
+    tc = MPSComparator(words=words, bond_dimension=6)
+    losses, val_cm, val_cr = tc.train(X=df.drop("target", axis=1), y=df["target"], print_freq=5)
 
     logging.info("Validation report :", val_cr)
