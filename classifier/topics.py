@@ -4,10 +4,28 @@ from itertools import chain
 from collections import defaultdict, Counter
 from sklearn.tree import DecisionTreeClassifier as dct
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, classification_report
+from abc import ABC, abstractmethod
+
+class TopicComparator(ABC):
+
+    def __init__(self):
+        pass
+
+    @abstractmethod
+    def train(self):
+        pass
 
 
-class TopicComparator:
+    def report(y_true, y_pred, threshold:float = 0.5, verbose:bool = True):
+        CM = confusion_matrix(y_true, y_pred > threshold, labels=[0, 1])
+        CR = classification_report(y_true, y_pred, output_dict=True)
+        if verbose:
+            print(classification_report(y_true, y_pred, output_dict=false))
+        return confusion_matrix, classification_report()
+
+
+class TreeComparator(TopicComparator):
 
     def __init__(self):
         self.freq = defaultdict(int)
@@ -59,14 +77,12 @@ class TopicComparator:
                     name='validation')
         return X_val, y_val
 
-    def report(self, y_true, y_pred, name):
-        CM = confusion_matrix(y_true, y_pred, labels=[0, 1])
-        print(CM)
-        TN = CM[0][0]
-        FN = CM[1][0]
-        TP = CM[1][1]
-        FP = CM[0][1]
-        self.reports[name] = pd.Series({
-            'tnr': TN / (TN + FP),
-            'tpr': TP / (TP + FN)
-        })
+
+class TNComparator(TopicComparator):
+
+    def __init__(self):
+
+    def train:
+        optimize(dictionary, loss, print_freq=5)
+
+    def
